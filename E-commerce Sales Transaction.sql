@@ -29,6 +29,7 @@ select min(order_date) as first_order,
 from ecommerce_sales;
 
 --CUSTOMER SEGMENTATION:
+
 --1.Build Customer Summary:
 select 
     customer_id,
@@ -41,35 +42,34 @@ group by customer_id;
 
 --2.Create Customer Segments:
 
-select *,
-	case 
-		when total_spent >= 5000 then 'premium'
-		when total_spent >= 2000 then 'regular'
-		else 'low value'
-		end as customer_segment
- from 
-     (
-      select 
-			customer_id,
-			count(order_id) as total_orders,
-			sum(total_amount) as total_spent,
-  			avg(total_amount) as avg_total_value,
-			sum(quantity) as total_quantity
-	 from ecommerce_sales
-     group by customer_id) s;
+WITH customer_summary AS (
+    SELECT 
+        customer_id,
+        COUNT(order_id) AS total_orders,
+        SUM(total_amount) AS total_spent,
+        AVG(total_amount) AS avg_order_value,
+        SUM(quantity) AS total_quantity
+    FROM ecommerce_sales
+    GROUP BY customer_id
+),
+segmented_customers AS (
+    SELECT *,
+        CASE 
+            WHEN total_spent >= 5000 THEN 'Premium'
+            WHEN total_spent >= 2000 THEN 'Regular'
+            ELSE 'Low Value'
+        END AS customer_segment
+    FROM customer_summary
+)
+SELECT * FROM segmented_customers;
 
 /*SEGMENT ANALYSIS:
 
 1.Revenue by Segment:
 This tells which segment brings money*/
 
-SELECT
-    customer_segment,
-    COUNT(customer_id) AS total_customers,
-    SUM(total_spent) AS total_revenue,
-    AVG(total_spent) AS avg_spend_per_customer
-FROM (
-    SELECT
+WITH customer_segments AS (
+    SELECT 
         customer_id,
         SUM(total_amount) AS total_spent,
         CASE 
@@ -79,7 +79,13 @@ FROM (
         END AS customer_segment
     FROM ecommerce_sales
     GROUP BY customer_id
-) t
+)
+SELECT 
+    customer_segment,
+    COUNT(customer_id) AS total_customers,
+    SUM(total_spent) AS total_revenue,
+    AVG(total_spent) AS avg_spend_per_customer
+FROM customer_segments
 GROUP BY customer_segment
 ORDER BY total_revenue DESC;
 
